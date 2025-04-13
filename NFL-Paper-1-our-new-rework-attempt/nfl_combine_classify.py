@@ -5,14 +5,15 @@ Modified on [Date]
 
 This classifier merges combine predictor data from the old files:
   NFL 2013_edit.xlsx, NFL 2014_edit.xlsx, NFL 2015_edit.xlsx, NFL 2016_edit.xlsx, NFL 2017_edit.xlsx
-with target data (TD) from the new files:
-  2015-new-data.xlsx, 2016-new-data.xlsx, 2017-new-data.xlsx.
+with target data from the new files:
+  2015-new-data.xlsx, NFL 2016-new-data.xlsx, NFL 2017-new-data.xlsx.
   
-After merging (using the common key, which is normalized to "Player"), the TD target is converted into a binary label 
-(1 if TD > 0, else 0). The predictors used are the combine metrics:
+After merging (using the common key normalized to "Player"), the two columns RUTD and RECTD are combined
+by summing them into a new column "TARGET". For classification, "TARGET" is converted into a binary label 
+(1 if TARGET > 0, else 0). The predictors used are the combine metrics:
 '40yd', 'Vertical', 'BP', 'Broad Jump', 'Shuttle', and '3Cone'.
 
-If your files use a different common identifier, update the code accordingly.
+SMOTE is applied to the training set to mitigate class imbalance.
 """
 
 import argparse
@@ -27,6 +28,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+# Import SMOTE from imblearn for oversampling
+from imblearn.over_sampling import SMOTE
 
 # Import the regressor class to reuse the data loading functions
 from nfl_combine_regressor import nflCombineRegressor
@@ -45,7 +49,6 @@ class nflCombineClassify(nflCombineRegressor):
         for df in [self.pd_2015, self.pd_2016, self.pd_2017]:
             if "Name" in df.columns and "Player" not in df.columns:
                 df.rename(columns={"Name": "Player"}, inplace=True)
-            # Also ensure numeric conversion for predictor columns.
             for col in cols:
                 if col in df.columns:
                     df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
@@ -53,9 +56,9 @@ class nflCombineClassify(nflCombineRegressor):
         
     def snaps_to_binary(self):
         """
-        Merges the combine data (from old files) with the new target data (TD) on the "Player" key for 2015-2017,
-        converts the TD value into a binary label (1 if TD > 0, else 0),
-        scales the predictors, and splits the data.
+        Merges the combine data (from old files) with the new target data on the "Player" key for 2015-2017,
+        creates "TARGET" as the sum of RUTD and RECTD, converts TARGET to a binary label (1 if TARGET > 0, else 0),
+        scales the predictors, splits the data, and applies SMOTE on the training set.
         """
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
         common_key = "Player"
@@ -66,27 +69,27 @@ class nflCombineClassify(nflCombineRegressor):
             if common_key not in df.columns:
                 raise KeyError(f"Common key '{common_key}' not found in {name}. Available columns: {list(df.columns)}")
 
-        # Merge the predictor and target data on the common key for each year
-        merged_2015 = pd.merge(self.pd_2015, self.new_pd_2015[[common_key, 'TD']], on=common_key, how='inner')
-        merged_2016 = pd.merge(self.pd_2016, self.new_pd_2016[[common_key, 'TD']], on=common_key, how='inner')
-        merged_2017 = pd.merge(self.pd_2017, self.new_pd_2017[[common_key, 'TD']], on=common_key, how='inner')
+        # Merge the predictor and target data on the common key for each year.
+        merged_2015 = pd.merge(self.pd_2015, self.new_pd_2015[[common_key, 'TARGET']], on=common_key, how='inner')
+        merged_2016 = pd.merge(self.pd_2016, self.new_pd_2016[[common_key, 'TARGET']], on=common_key, how='inner')
+        merged_2017 = pd.merge(self.pd_2017, self.new_pd_2017[[common_key, 'TARGET']], on=common_key, how='inner')
         
-        # Ensure TD is numeric and drop rows with missing predictor or target values.
+        # Ensure TARGET is numeric and drop rows with missing predictor or target values.
         for df in [merged_2015, merged_2016, merged_2017]:
-            df['TD'] = pd.to_numeric(df['TD'], errors='coerce')
-            df.dropna(subset=cols + ['TD'], inplace=True)
+            df['TARGET'] = pd.to_numeric(df['TARGET'], errors='coerce')
+            df.dropna(subset=cols + ['TARGET'], inplace=True)
         
-        # Convert TD to binary: 1 if TD > 0, else 0.
-        merged_2015['TD'] = (merged_2015['TD'] > 0).astype(int)
-        merged_2016['TD'] = (merged_2016['TD'] > 0).astype(int)
-        merged_2017['TD'] = (merged_2017['TD'] > 0).astype(int)
+        # Convert TARGET to binary: 1 if TARGET > 0, else 0.
+        merged_2015['TARGET'] = (merged_2015['TARGET'] > 0).astype(int)
+        merged_2016['TARGET'] = (merged_2016['TARGET'] > 0).astype(int)
+        merged_2017['TARGET'] = (merged_2017['TARGET'] > 0).astype(int)
         
         X_2015 = merged_2015[cols]
-        y_2015 = merged_2015['TD']
+        y_2015 = merged_2015['TARGET']
         X_2016 = merged_2016[cols]
-        y_2016 = merged_2016['TD']
+        y_2016 = merged_2016['TARGET']
         X_2017 = merged_2017[cols]
-        y_2017 = merged_2017['TD']
+        y_2017 = merged_2017['TARGET']
         
         print(len(X_2015), "Samples for - 2015")
         print(len(X_2016), "Samples for - 2016")
@@ -99,7 +102,14 @@ class nflCombineClassify(nflCombineRegressor):
         X_scaled = scaler.fit_transform(X)
         X = pd.DataFrame(X_scaled, columns=cols, index=X.index)
         
-        self.x_train_class, self.x_test_class, self.y_train_class, self.y_test_class = train_test_split(X, y, train_size=0.8)
+        # Split into training and test sets (using stratification).
+        self.x_train_class, self.x_test_class, self.y_train_class, self.y_test_class = train_test_split(
+            X, y, train_size=0.8, stratify=y, random_state=42
+        )
+        
+        # Apply SMOTE on the training set to balance classes.
+        sm = SMOTE(random_state=42)
+        self.x_train_class, self.y_train_class = sm.fit_resample(self.x_train_class, self.y_train_class)
     
     def model_test_classify(self):
         """
@@ -205,7 +215,7 @@ class nflCombineClassify(nflCombineRegressor):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run NFL Combine Classifier with merged combine data (old files) and binary TD labels from new files."
+        description="Run NFL Combine Classifier with merged combine data (old files) and binary TARGET labels (RUTD + RECTD) from new files."
     )
     parser.add_argument(
         "--path", 
