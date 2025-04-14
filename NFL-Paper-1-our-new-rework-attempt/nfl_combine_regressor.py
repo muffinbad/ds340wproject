@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Modified on [Date]
-
-This script merges combine predictor data from the old NFL files:
-  NFL 2013_edit.xlsx, NFL 2014_edit.xlsx, NFL 2015_edit.xlsx, NFL 2016_edit.xlsx, NFL 2017_edit.xlsx
-with the target variable pulled from the new files:
-  2015-new-data.xlsx, 2016-new-data.xlsx, NFL 2017-new-data.xlsx.
-  
-For the target, the new files now provide two columns, RUTD and RECTD.
-We create a new column "TARGET" as the sum of RUTD and RECTD.
-The merged data use "TARGET" as the target variable.
-The merging is done on the common key "Player" (with normalization if necessary).
-"""
 
 import os
 import argparse
@@ -47,10 +34,6 @@ class nflCombineRegressor:
         self.path = path
 
     def read_in(self, path):
-        """
-        Reads in the combine data from the old files.
-        Afterwards, if the key column is named "Name" in any file, rename it to "Player".
-        """
         file_2013 = os.path.join(path, "NFL 2013_edit.xlsx")
         file_2014 = os.path.join(path, "NFL 2014_edit.xlsx")
         file_2015 = os.path.join(path, "NFL 2015_edit.xlsx")
@@ -69,12 +52,6 @@ class nflCombineRegressor:
                 df.rename(columns={"Name": "Player"}, inplace=True)
 
     def load_new_data(self):
-        """
-        Reads in the new target files (which now contain the columns RUTD and RECTD).
-        Assumes that the header is on the second row (header=1) and cleans the column names.
-        Also, if the key column appears in lowercase ("player"), renames it to "Player".
-        Then, creates a new column "TARGET" as the sum of RUTD and RECTD.
-        """
         file_2015_new = os.path.join(self.path, "2015-new-data.xlsx")
         file_2016_new = os.path.join(self.path, "2016-new-data.xlsx")
         file_2017_new = os.path.join(self.path, "2017-new-data.xlsx")
@@ -83,13 +60,11 @@ class nflCombineRegressor:
         self.new_pd_2016 = pd.read_excel(file_2016_new, header=1)
         self.new_pd_2017 = pd.read_excel(file_2017_new, header=1)
         
-        # Clean column names (strip extra whitespace)
         for df in [self.new_pd_2015, self.new_pd_2016, self.new_pd_2017]:
             df.columns = df.columns.str.strip()
             if 'player' in df.columns and 'Player' not in df.columns:
                 df.rename(columns={'player': 'Player'}, inplace=True)
         
-        # Convert RUTD and RECTD to numeric and create a combined target column "TARGET"
         for df in [self.new_pd_2015, self.new_pd_2016, self.new_pd_2017]:
             df['RUTD'] = pd.to_numeric(df['RUTD'], errors='coerce')
             df['RECTD'] = pd.to_numeric(df['RECTD'], errors='coerce')
@@ -101,26 +76,18 @@ class nflCombineRegressor:
         print(len(self.new_pd_2017), "Target samples loaded for - 2017")
 
     def split_test(self):
-        """
-        Merges combine data (from old files) with the new target values (TARGET) on the "Player" key,
-        drops rows with missing predictor or target values or with TARGET equal to 0,
-        scales the predictors, and splits the data into training (80%), validation (10%), and test (10%) sets.
-        """
         common_key = "Player"
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
 
-        # Check for the common key in all DataFrames.
         for df, name in [(self.pd_2015, "pd_2015"), (self.pd_2016, "pd_2016"), (self.pd_2017, "pd_2017"),
                          (self.new_pd_2015, "new_pd_2015"), (self.new_pd_2016, "new_pd_2016"), (self.new_pd_2017, "new_pd_2017")]:
             if common_key not in df.columns:
                 raise KeyError(f"Common key '{common_key}' not found in {name}. Available columns: {list(df.columns)}")
         
-        # Merge each year's combine data with the corresponding new target data on "Player".
         merged_2015 = pd.merge(self.pd_2015, self.new_pd_2015[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2016 = pd.merge(self.pd_2016, self.new_pd_2016[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2017 = pd.merge(self.pd_2017, self.new_pd_2017[[common_key, 'TARGET']], on=common_key, how='inner')
 
-        # For each merged dataset, convert TARGET to numeric, drop rows with missing values, and remove rows where TARGET == 0.
         for df in [merged_2015, merged_2016, merged_2017]:
             df['TARGET'] = pd.to_numeric(df['TARGET'], errors='coerce')
             df.dropna(subset=cols + ['TARGET'], inplace=True)
@@ -148,9 +115,6 @@ class nflCombineRegressor:
         self.x_valid, self.x_test, self.y_valid, self.y_test = train_test_split(self.x_rem, self.y_rem, test_size=0.5)
      
     def model_test(self):
-        """
-        Evaluates several regressors using 10-fold cross-validation and then fits a final Linear Regression model on the test set.
-        """
         GB = cross_validate(
             GradientBoostingRegressor(),
             self.x_train, self.y_train, cv=10,
@@ -197,9 +161,6 @@ class nflCombineRegressor:
         return final_model
         
     def plot_feature_importance(self, final_model):
-        """
-        Uses the Linear Regression coefficients as feature importances and plots them.
-        """
         importance = final_model.coef_
         print("Example coefficient:", importance[1])
         for i, v in enumerate(importance):
