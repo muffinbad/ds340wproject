@@ -1,20 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Modified on [Date]
 
-This classifier merges combine predictor data from the old files:
-  NFL 2013_edit.xlsx, NFL 2014_edit.xlsx, NFL 2015_edit.xlsx, NFL 2016_edit.xlsx, NFL 2017_edit.xlsx
-with target data from the new files:
-  2015-new-data.xlsx, NFL 2016-new-data.xlsx, NFL 2017-new-data.xlsx.
-  
-After merging (using the common key normalized to "Player"), the two columns RUTD and RECTD are combined
-by summing them into a new column "TARGET". For classification, "TARGET" is converted into a binary label 
-(1 if TARGET > 0, else 0). The predictors used are the combine metrics:
-'40yd', 'Vertical', 'BP', 'Broad Jump', 'Shuttle', and '3Cone'.
-
-SMOTE is applied to the training set to mitigate class imbalance.
-"""
 
 import argparse
 import numpy as np
@@ -28,11 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-# Import SMOTE from imblearn for oversampling
-from imblearn.over_sampling import SMOTE
-
-# Import the regressor class to reuse the data loading functions
+from imblearn.over_sampling import SMOTE #SMOTE
 from nfl_combine_regressor import nflCombineRegressor
 
 class nflCombineClassify(nflCombineRegressor):
@@ -40,11 +22,9 @@ class nflCombineClassify(nflCombineRegressor):
     def __init__(self, path):
         super().__init__()
         self.set_path(path)
-        # Read in combine data (old files) and new target data.
         super().read_in(path)
         super().load_new_data()
         
-        # Normalize the predictor key in the old files if needed (rename "Name" to "Player")
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
         for df in [self.pd_2015, self.pd_2016, self.pd_2017]:
             if "Name" in df.columns and "Player" not in df.columns:
@@ -55,31 +35,22 @@ class nflCombineClassify(nflCombineRegressor):
                     df[col] = pd.to_numeric(df[col], errors='coerce')
         
     def snaps_to_binary(self):
-        """
-        Merges the combine data (from old files) with the new target data on the "Player" key for 2015-2017,
-        creates "TARGET" as the sum of RUTD and RECTD, converts TARGET to a binary label (1 if TARGET > 0, else 0),
-        scales the predictors, splits the data, and applies SMOTE on the training set.
-        """
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
         common_key = "Player"
 
-        # --- Check for the common key in all DataFrames ---
         for df, name in [(self.pd_2015, "pd_2015"), (self.pd_2016, "pd_2016"), (self.pd_2017, "pd_2017"),
                          (self.new_pd_2015, "new_pd_2015"), (self.new_pd_2016, "new_pd_2016"), (self.new_pd_2017, "new_pd_2017")]:
             if common_key not in df.columns:
                 raise KeyError(f"Common key '{common_key}' not found in {name}. Available columns: {list(df.columns)}")
 
-        # Merge the predictor and target data on the common key for each year.
         merged_2015 = pd.merge(self.pd_2015, self.new_pd_2015[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2016 = pd.merge(self.pd_2016, self.new_pd_2016[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2017 = pd.merge(self.pd_2017, self.new_pd_2017[[common_key, 'TARGET']], on=common_key, how='inner')
         
-        # Ensure TARGET is numeric and drop rows with missing predictor or target values.
         for df in [merged_2015, merged_2016, merged_2017]:
             df['TARGET'] = pd.to_numeric(df['TARGET'], errors='coerce')
             df.dropna(subset=cols + ['TARGET'], inplace=True)
         
-        # Convert TARGET to binary: 1 if TARGET > 0, else 0.
         merged_2015['TARGET'] = (merged_2015['TARGET'] > 0).astype(int)
         merged_2016['TARGET'] = (merged_2016['TARGET'] > 0).astype(int)
         merged_2017['TARGET'] = (merged_2017['TARGET'] > 0).astype(int)
@@ -112,10 +83,6 @@ class nflCombineClassify(nflCombineRegressor):
         self.x_train_class, self.y_train_class = sm.fit_resample(self.x_train_class, self.y_train_class)
     
     def model_test_classify(self):
-        """
-        Evaluates several classifiers using 10-fold cross-validation, prints the mean accuracies,
-        and then tunes a RandomForest classifier using RandomizedSearchCV.
-        """
         DT = cross_validate(
             DecisionTreeClassifier(), 
             self.x_train_class, 
@@ -197,9 +164,6 @@ class nflCombineClassify(nflCombineRegressor):
         return test_model
 
     def plot_feature_importance_classify(self, test_model):
-        """
-        Plots feature importances from the tuned RandomForest classifier.
-        """
         test_model_imp = pd.Series(
             test_model.best_estimator_.feature_importances_,
             index=self.x_test_class.columns
