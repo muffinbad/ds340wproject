@@ -25,6 +25,8 @@ class nflCombineRegressor:
         self.pd_2016 = None
         self.pd_2017 = None
         # Placeholders for new target data
+        self.new_pd_2013 = None
+        self.new_pd_2014 = None
         self.new_pd_2015 = None
         self.new_pd_2016 = None
         self.new_pd_2017 = None
@@ -52,25 +54,31 @@ class nflCombineRegressor:
                 df.rename(columns={"Name": "Player"}, inplace=True)
 
     def load_new_data(self):
+        file_2013_new = os.path.join(self.path, "2013-new-data.xlsx")
+        file_2014_new = os.path.join(self.path, "2014-new-data.xlsx")
         file_2015_new = os.path.join(self.path, "2015-new-data.xlsx")
         file_2016_new = os.path.join(self.path, "2016-new-data.xlsx")
         file_2017_new = os.path.join(self.path, "2017-new-data.xlsx")
         
+        self.new_pd_2013 = pd.read_excel(file_2013_new, header=1)
+        self.new_pd_2014 = pd.read_excel(file_2014_new, header=1)
         self.new_pd_2015 = pd.read_excel(file_2015_new, header=1)
         self.new_pd_2016 = pd.read_excel(file_2016_new, header=1)
         self.new_pd_2017 = pd.read_excel(file_2017_new, header=1)
         
-        for df in [self.new_pd_2015, self.new_pd_2016, self.new_pd_2017]:
+        for df in [self.new_pd_2013, self.new_pd_2014, self.new_pd_2015, self.new_pd_2016, self.new_pd_2017]:
             df.columns = df.columns.str.strip()
             if 'player' in df.columns and 'Player' not in df.columns:
                 df.rename(columns={'player': 'Player'}, inplace=True)
         
-        for df in [self.new_pd_2015, self.new_pd_2016, self.new_pd_2017]:
+        for df in [self.new_pd_2013, self.new_pd_2014, self.new_pd_2015, self.new_pd_2016, self.new_pd_2017]:
             df['RUTD'] = pd.to_numeric(df['RUTD'], errors='coerce')
             df['RECTD'] = pd.to_numeric(df['RECTD'], errors='coerce')
             # Fill missing values with 0 and sum the two columns.
             df['TARGET'] = df['RUTD'].fillna(0) + df['RECTD'].fillna(0)
         
+        print(len(self.new_pd_2013), "Target samples loaded for - 2013")
+        print(len(self.new_pd_2014), "Target samples loaded for - 2014")
         print(len(self.new_pd_2015), "Target samples loaded for - 2015")
         print(len(self.new_pd_2016), "Target samples loaded for - 2016")
         print(len(self.new_pd_2017), "Target samples loaded for - 2017")
@@ -79,20 +87,26 @@ class nflCombineRegressor:
         common_key = "Player"
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
 
-        for df, name in [(self.pd_2015, "pd_2015"), (self.pd_2016, "pd_2016"), (self.pd_2017, "pd_2017"),
-                         (self.new_pd_2015, "new_pd_2015"), (self.new_pd_2016, "new_pd_2016"), (self.new_pd_2017, "new_pd_2017")]:
+        for df, name in [(self.pd_2015, "pd_2013"), (self.pd_2015, "pd_2014"), (self.pd_2015, "pd_2015"), (self.pd_2016, "pd_2016"), (self.pd_2017, "pd_2017"),
+                         (self.new_pd_2013, "new_pd_2013"), (self.new_pd_2014, "new_pd_2014"), (self.new_pd_2015, "new_pd_2015"), (self.new_pd_2016, "new_pd_2016"), (self.new_pd_2017, "new_pd_2017")]:
             if common_key not in df.columns:
                 raise KeyError(f"Common key '{common_key}' not found in {name}. Available columns: {list(df.columns)}")
         
+        merged_2013 = pd.merge(self.pd_2013, self.new_pd_2013[[common_key, 'TARGET']], on=common_key, how='inner')
+        merged_2014 = pd.merge(self.pd_2014, self.new_pd_2014[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2015 = pd.merge(self.pd_2015, self.new_pd_2015[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2016 = pd.merge(self.pd_2016, self.new_pd_2016[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2017 = pd.merge(self.pd_2017, self.new_pd_2017[[common_key, 'TARGET']], on=common_key, how='inner')
 
-        for df in [merged_2015, merged_2016, merged_2017]:
+        for df in [merged_2013, merged_2014, merged_2015, merged_2016, merged_2017]:
             df['TARGET'] = pd.to_numeric(df['TARGET'], errors='coerce')
             df.dropna(subset=cols + ['TARGET'], inplace=True)
             df = df[df['TARGET'] != 0]
 
+        X_2013 = merged_2013[cols]
+        y_2013 = merged_2013['TARGET']
+        X_2014 = merged_2014[cols]
+        y_2014 = merged_2014['TARGET']
         X_2015 = merged_2015[cols]
         y_2015 = merged_2015['TARGET']
         X_2016 = merged_2016[cols]
@@ -100,12 +114,14 @@ class nflCombineRegressor:
         X_2017 = merged_2017[cols]
         y_2017 = merged_2017['TARGET']
 
+        print(len(X_2013), "Samples used for - 2013")
+        print(len(X_2014), "Samples used for - 2014")
         print(len(X_2015), "Samples used for - 2015")
         print(len(X_2016), "Samples used for - 2016")
         print(len(X_2017), "Samples used for - 2017")
 
-        X = pd.concat([X_2015, X_2016, X_2017])
-        y = pd.concat([y_2015, y_2016, y_2017])
+        X = pd.concat([X_2013, X_2014, X_2015, X_2016, X_2017])
+        y = pd.concat([y_2013, y_2014, y_2015, y_2016, y_2017])
 
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)

@@ -26,7 +26,7 @@ class nflCombineClassify(nflCombineRegressor):
         super().load_new_data()
         
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
-        for df in [self.pd_2015, self.pd_2016, self.pd_2017]:
+        for df in [self.pd_2013, self.pd_2014, self.pd_2015, self.pd_2016, self.pd_2017]:
             if "Name" in df.columns and "Player" not in df.columns:
                 df.rename(columns={"Name": "Player"}, inplace=True)
             for col in cols:
@@ -38,23 +38,31 @@ class nflCombineClassify(nflCombineRegressor):
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
         common_key = "Player"
 
-        for df, name in [(self.pd_2015, "pd_2015"), (self.pd_2016, "pd_2016"), (self.pd_2017, "pd_2017"),
-                         (self.new_pd_2015, "new_pd_2015"), (self.new_pd_2016, "new_pd_2016"), (self.new_pd_2017, "new_pd_2017")]:
+        for df, name in [(self.pd_2013, "pd_2013"), (self.pd_2014, "pd_2014"), (self.pd_2015, "pd_2015"), (self.pd_2016, "pd_2016"), (self.pd_2017, "pd_2017"),
+                         (self.new_pd_2013, "new_pd_2013"), (self.new_pd_2014, "new_pd_2014"), (self.new_pd_2015, "new_pd_2015"), (self.new_pd_2016, "new_pd_2016"), (self.new_pd_2017, "new_pd_2017")]:
             if common_key not in df.columns:
                 raise KeyError(f"Common key '{common_key}' not found in {name}. Available columns: {list(df.columns)}")
 
+        merged_2013 = pd.merge(self.pd_2013, self.new_pd_2013[[common_key, 'TARGET']], on=common_key, how='inner')
+        merged_2014 = pd.merge(self.pd_2014, self.new_pd_2014[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2015 = pd.merge(self.pd_2015, self.new_pd_2015[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2016 = pd.merge(self.pd_2016, self.new_pd_2016[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2017 = pd.merge(self.pd_2017, self.new_pd_2017[[common_key, 'TARGET']], on=common_key, how='inner')
         
-        for df in [merged_2015, merged_2016, merged_2017]:
+        for df in [merged_2013, merged_2014, merged_2015, merged_2016, merged_2017]:
             df['TARGET'] = pd.to_numeric(df['TARGET'], errors='coerce')
             df.dropna(subset=cols + ['TARGET'], inplace=True)
         
+        merged_2013['TARGET'] = (merged_2013['TARGET'] > 0).astype(int)
+        merged_2014['TARGET'] = (merged_2014['TARGET'] > 0).astype(int)
         merged_2015['TARGET'] = (merged_2015['TARGET'] > 0).astype(int)
         merged_2016['TARGET'] = (merged_2016['TARGET'] > 0).astype(int)
         merged_2017['TARGET'] = (merged_2017['TARGET'] > 0).astype(int)
         
+        X_2013 = merged_2013[cols]
+        y_2013 = merged_2013['TARGET']
+        X_2014 = merged_2014[cols]
+        y_2014 = merged_2014['TARGET']
         X_2015 = merged_2015[cols]
         y_2015 = merged_2015['TARGET']
         X_2016 = merged_2016[cols]
@@ -62,12 +70,14 @@ class nflCombineClassify(nflCombineRegressor):
         X_2017 = merged_2017[cols]
         y_2017 = merged_2017['TARGET']
         
+        print(len(X_2013), "Samples for - 2013")
+        print(len(X_2014), "Samples for - 2014")
         print(len(X_2015), "Samples for - 2015")
         print(len(X_2016), "Samples for - 2016")
         print(len(X_2017), "Samples for - 2017")
         
-        X = pd.concat([X_2015, X_2016, X_2017])
-        y = pd.concat([y_2015, y_2016, y_2017])
+        X = pd.concat([X_2013, X_2014, X_2015, X_2016, X_2017])
+        y = pd.concat([y_2013, y_2014, y_2015, y_2016, y_2017])
         
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
