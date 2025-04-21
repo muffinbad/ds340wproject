@@ -7,6 +7,6 @@ with some minor path and data loading changes so it is able to run on our person
 
 NFL-Paper-1-our-new-rework-attempt- This is the folder with our changes and novelty. To run it, please make sure you have all of the code files and all of the data in the same folder. nfl_combine_classify.py is 
 the classifier with 'Touchdowns' as the target variable. Please run that if you would like to see our offensive touchdown metric output. nfl_combine_classify_Tackles.py is the classifier with 'solo tackles' as 
-the target variable. Please run that if you would like to see our offensive touchdown metric output. 
+the target variable. Please run that if you would like to see our defensive metric output. 
 Both of the regressor files were needed as the classifiers imported them and used some functions. However, you do not need to run them and just run the classifiers to see the output. Please keep in mind that 
-the classifiers will take quite some time to finish running and get the output. The training and cross-validation takes time.
+the classifiers will take quite some time to finish running and get the output. The training and cross-validation take time.
