@@ -252,9 +252,6 @@ class nflCombineRegressor:
         
     def plot_feature_importance(self, final_model):
         importance = final_model.coef_
-        print("Example coefficient:", importance[1])
-        for i, v in enumerate(importance):
-            print('Feature: %0d, Score: %.5f' % (i, v))
 
         feature_imp = pd.Series(np.abs(importance), index=self.x_test.columns).sort_values(ascending=False)
         fig, axs = plt.subplots(1, 1)
@@ -266,6 +263,7 @@ class nflCombineRegressor:
         plt.draw()
         plt.show()
         fig.savefig("feature_imp_regression.png", dpi=150)
+
 
 def main():
     parser = argparse.ArgumentParser(
