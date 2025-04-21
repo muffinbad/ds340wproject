@@ -13,9 +13,9 @@ from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-
+#Upadted all the new data that we read in
 class nflCombineRegressor:
-    def __init__(self):
+    def __init__(self): 
         self.pd_2013 = self.pd_2014 = self.pd_2015 = self.pd_2016 = None
         self.pd_2017 = self.pd_2018 = self.pd_2019 = self.pd_2020 = None
         self.pd_2021 = self.pd_2022 = self.pd_2023 = self.pd_2024 = None
@@ -100,7 +100,7 @@ class nflCombineRegressor:
                 df.rename(columns={"player": "Player"}, inplace=True)
 
             df["Solo"] = pd.to_numeric(df["Solo"], errors="coerce")
-            df["TARGET"] = df["Solo"].fillna(0)
+            df["TARGET"] = df["Solo"].fillna(0) #This is the solo tackles column that we are evaluating for tackles
 
         print(len(self.new_pd_2013), "Target samples loaded for - 2013")
         print(len(self.new_pd_2014), "Target samples loaded for - 2014")
