@@ -22,23 +22,25 @@ class nflCombineClassify(nflCombineRegressor):
         super().load_new_data()
         
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
-        for df in [self.pd_2013, self.pd_2014, self.pd_2015, self.pd_2016, self.pd_2017, self.pd_2018, self.pd_2019, self.pd_2020, self.pd_2021, self.pd_2022, self.pd_2023, self.pd_2024]:
+        for df in [self.pd_2013, self.pd_2014, self.pd_2015, self.pd_2016, self.pd_2017, self.pd_2018, self.pd_2019, self.pd_2020, self.pd_2021, self.pd_2022, self.pd_2023, self.pd_2024]: #all of the data
             if "Name" in df.columns and "Player" not in df.columns:
                 df.rename(columns={"Name": "Player"}, inplace=True)
             for col in cols:
                 if col in df.columns:
                     df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
                     df[col] = pd.to_numeric(df[col], errors='coerce')
-        
+        #keeping all of the combine data metrics
     def snaps_to_binary(self):
         cols = ['40yd','Vertical','BP','Broad Jump','Shuttle','3Cone']
         common_key = "Player"
 
+        
         for df, name in [(self.pd_2013, "pd_2013"), (self.pd_2014, "pd_2014"), (self.pd_2015, "pd_2015"), (self.pd_2016, "pd_2016"), (self.pd_2017, "pd_2017"), (self.pd_2018, "pd_2018"), (self.pd_2019, "pd_2019"), (self.pd_2020, "pd_2020"), (self.pd_2021, "pd_2021"), (self.pd_2022, "pd_2022"), (self.pd_2023, "pd_2023"), (self.pd_2024, "pd_2024"),
                          (self.new_pd_2013, "new_pd_2013"), (self.new_pd_2014, "new_pd_2014"), (self.new_pd_2015, "new_pd_2015"), (self.new_pd_2016, "new_pd_2016"), (self.new_pd_2017, "new_pd_2017"), (self.new_pd_2018, "new_pd_2018"), (self.new_pd_2019, "new_pd_2019"), (self.new_pd_2020, "new_pd_2020"), (self.new_pd_2021, "new_pd_2021"), (self.new_pd_2022, "new_pd_2022"), (self.new_pd_2023, "new_pd_2023"), (self.new_pd_2024, "new_pd_2024")]:
             if common_key not in df.columns:
                 raise KeyError(f"Common key '{common_key}' not found in {name}. Available columns: {list(df.columns)}")
 
+        #updated new data
         merged_2013 = pd.merge(self.pd_2013, self.new_pd_2013[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2014 = pd.merge(self.pd_2014, self.new_pd_2014[[common_key, 'TARGET']], on=common_key, how='inner')
         merged_2015 = pd.merge(self.pd_2015, self.new_pd_2015[[common_key, 'TARGET']], on=common_key, how='inner')
@@ -68,7 +70,8 @@ class nflCombineClassify(nflCombineRegressor):
         merged_2022['TARGET'] = (merged_2022['TARGET'] > 0).astype(int)
         merged_2023['TARGET'] = (merged_2023['TARGET'] > 0).astype(int)
         merged_2024['TARGET'] = (merged_2024['TARGET'] > 0).astype(int)
-        
+
+        #data for all the years we have
         X_2013 = merged_2013[cols]
         y_2013 = merged_2013['TARGET']
         X_2014 = merged_2014[cols]
@@ -122,7 +125,8 @@ class nflCombineClassify(nflCombineRegressor):
         # Apply SMOTE on the training set to balance classes.
         sm = SMOTE(random_state=42)
         self.x_train_class, self.y_train_class = sm.fit_resample(self.x_train_class, self.y_train_class)
-    
+
+    #model training
     def model_test_classify(self):
         DT = cross_validate(
             DecisionTreeClassifier(), 
@@ -203,7 +207,7 @@ class nflCombineClassify(nflCombineRegressor):
         print('Test accuracy:', accuracy_score(self.y_test_class, test_pred))
 
         return test_model
-
+        #visualize the random forest classifiers importance
     def plot_feature_importance_classify(self, test_model):
         test_model_imp = pd.Series(
             test_model.best_estimator_.feature_importances_,
