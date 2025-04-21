@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import time
 
+#updated all the new data that we read in
 class nflCombineRegressor:
     def __init__(self):
-        # Placeholders for combine data (old files)
         self.pd_2013 = None
         self.pd_2014 = None
         self.pd_2015 = None
@@ -114,7 +114,7 @@ class nflCombineRegressor:
             df['RUTD'] = pd.to_numeric(df['RUTD'], errors='coerce')
             df['RECTD'] = pd.to_numeric(df['RECTD'], errors='coerce')
             # Fill missing values with 0 and sum the two columns.
-            df['TARGET'] = df['RUTD'].fillna(0) + df['RECTD'].fillna(0)
+            df['TARGET'] = df['RUTD'].fillna(0) + df['RECTD'].fillna(0) #our measurement metric for touchdowns
         
         print(len(self.new_pd_2013), "Target samples loaded for - 2013")
         print(len(self.new_pd_2014), "Target samples loaded for - 2014")
